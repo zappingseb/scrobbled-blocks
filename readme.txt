@@ -131,6 +131,14 @@ The plugin uses CSS custom properties that you can override. See the "CSS Custom
 
 Yes. The plugin uses WordPress transients for its own caching, which works alongside page caching plugins. However, if you use aggressive page caching, the "Now Playing" data may be slightly delayed. Consider excluding pages with the Now Playing block from full-page caching if real-time accuracy is important.
 
+= What exactly does the plugin request from Last.fm? =
+
+A single call to the `user.getRecentTracks` method, sending only your username, your API key, the response format and the number of tracks to retrieve. Nothing about your site visitors is transmitted. The request looks like this:
+
+`https://ws.audioscrobbler.com/2.0/?method=user.getRecentTracks&user=YOUR_USERNAME&api_key=YOUR_API_KEY&format=json&limit=5`
+
+Developers can find captured request and response payloads, the artwork fallback rules and the full Last.fm error-code table in docs/api.md in the [GitHub repository](https://github.com/jordesign/scrobbled-blocks).
+
 == Screenshots ==
 
 1. Now Playing block in the editor with live preview

@@ -53,6 +53,9 @@ format=json
 limit={number_of_tracks}
 ```
 
+See [docs/api.md](api.md) for captured request/response payloads, the two track shapes
+(scrobbled vs. now-playing), artwork edge cases and the full Last.fm error-code table.
+
 **Response Data Used:**
 - `track.name` - Track title
 - `track.artist['#text']` - Artist name
@@ -83,6 +86,7 @@ limit={number_of_tracks}
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | showArtwork | boolean | true | Display album artwork |
+| artworkSize | number | 64 | Artwork edge length in px, written to `--scrobble-artwork-size` |
 | showTimestamp | boolean | true | Display relative timestamp |
 | linkToLastFm | boolean | true | Link track/artist to Last.fm |
 
