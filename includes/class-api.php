@@ -36,6 +36,44 @@ class Scrobbled_Blocks_API {
 	const LASTFM_PLACEHOLDER_HASH = '2a96cbd8b46e442fc41c2b86b821562f';
 
 	/**
+	 * Cache key prefix for cover lookups from a fallback provider.
+	 *
+	 * Shares the scrobbled_blocks_ prefix so the activation and deactivation
+	 * transient sweeps in the main plugin file clear these too.
+	 */
+	const COVER_CACHE_KEY_PREFIX = 'scrobbled_blocks_cover_';
+
+	/**
+	 * How long a found cover URL is cached. Cover art effectively never changes.
+	 */
+	const COVER_CACHE_HIT_DAYS = 30;
+
+	/**
+	 * How long a failed lookup is cached.
+	 *
+	 * Misses are cached deliberately: a fifth of art-less albums resolve on no
+	 * provider at all, and without this they would be re-queried on every render.
+	 * The window is short so that newly added releases are picked up eventually.
+	 */
+	const COVER_CACHE_MISS_DAYS = 3;
+
+	/**
+	 * Maximum provider lookups performed while rendering a single page.
+	 *
+	 * A cold cache on a 20-track block would otherwise fire twenty HTTP requests
+	 * during one render. Tracks past the cap fall back to the placeholder and are
+	 * resolved on subsequent views instead.
+	 */
+	const COVER_LOOKUPS_PER_REQUEST = 5;
+
+	/**
+	 * Provider lookups performed so far during this request.
+	 *
+	 * @var int
+	 */
+	private $cover_lookups = 0;
+
+	/**
 	 * Single instance of the class.
 	 *
 	 * @var Scrobbled_Blocks_API|null
@@ -267,6 +305,15 @@ class Scrobbled_Blocks_API {
 				'artwork'    => $this->get_artwork_url( $raw_track, $placeholder_url ),
 			);
 
+			// Last.fm had no cover: try the fallback provider before settling for the placeholder.
+			if ( $track['artwork'] === $placeholder_url ) {
+				$fallback = $this->get_fallback_cover( $track['artist'], $track['album'] );
+
+				if ( $fallback ) {
+					$track['artwork'] = $fallback;
+				}
+			}
+
 			$tracks[] = $track;
 		}
 
@@ -277,6 +324,214 @@ class Scrobbled_Blocks_API {
 		}
 
 		return $tracks;
+	}
+
+	/**
+	 * Look up cover art for an album from the configured fallback provider.
+	 *
+	 * Only called for tracks where Last.fm supplied no usable artwork. Results are
+	 * cached per album, including misses, and the number of live lookups per
+	 * request is capped.
+	 *
+	 * @param string $artist Artist name as reported by Last.fm.
+	 * @param string $album  Album name as reported by Last.fm.
+	 * @return string Cover URL, or an empty string when nothing was found.
+	 */
+	private function get_fallback_cover( $artist, $album ) {
+		// Podcast and audiobook scrobbles often carry no album at all; nothing to search on.
+		if ( empty( $artist ) || empty( $album ) ) {
+			return '';
+		}
+
+		$settings = Scrobbled_Blocks_Settings::get_instance();
+
+		if ( ! $settings->is_cover_fallback_enabled() ) {
+			return '';
+		}
+
+		$provider  = $settings->get_cover_provider();
+		$cache_key = self::COVER_CACHE_KEY_PREFIX . md5( $provider . '|' . strtolower( $artist . '|' . $album ) );
+		$cached    = get_transient( $cache_key );
+
+		// An empty string is a cached miss, which is distinct from no cache entry.
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
+		if ( $this->cover_lookups >= self::COVER_LOOKUPS_PER_REQUEST ) {
+			return '';
+		}
+
+		++$this->cover_lookups;
+
+		if ( 'deezer' === $provider ) {
+			$cover = $this->lookup_cover_deezer( $artist, $album );
+		} else {
+			$cover = $this->lookup_cover_itunes( $artist, $album );
+		}
+
+		set_transient(
+			$cache_key,
+			$cover,
+			( $cover ? self::COVER_CACHE_HIT_DAYS : self::COVER_CACHE_MISS_DAYS ) * DAY_IN_SECONDS
+		);
+
+		return $cover;
+	}
+
+	/**
+	 * Reduce a Last.fm artist string to the billed artist.
+	 *
+	 * Last.fm joins featured performers into one field ("Ezra Collective, Libianca"),
+	 * which no cover provider will match as a single artist. The first entry is the
+	 * release artist.
+	 *
+	 * @param string $artist Artist name as reported by Last.fm.
+	 * @return string Primary artist name.
+	 */
+	private function get_primary_artist( $artist ) {
+		$parts = explode( ',', $artist );
+
+		return trim( $parts[0] );
+	}
+
+	/**
+	 * Query a cover provider and return the first usable image URL.
+	 *
+	 * @param string   $url    Provider search URL.
+	 * @param callable $picker Receives the decoded body, returns an image URL or ''.
+	 * @return string Cover URL, or an empty string.
+	 */
+	private function request_cover( $url, $picker ) {
+		// Kept short: this runs while a page is rendering.
+		$response = wp_remote_get(
+			$url,
+			array(
+				'timeout' => 5,
+				'headers' => array( 'Accept' => 'application/json' ),
+			)
+		);
+
+		if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
+			return '';
+		}
+
+		$data = json_decode( wp_remote_retrieve_body( $response ), true );
+
+		if ( ! is_array( $data ) ) {
+			return '';
+		}
+
+		return $picker( $data );
+	}
+
+	/**
+	 * Look up a cover on the iTunes Search API.
+	 *
+	 * Keyless. Falls back to the primary artist when the full Last.fm artist
+	 * string finds nothing.
+	 *
+	 * @param string $artist Artist name.
+	 * @param string $album  Album name.
+	 * @return string Cover URL, or an empty string.
+	 */
+	private function lookup_cover_itunes( $artist, $album ) {
+		$picker = static function ( $data ) {
+			if ( empty( $data['resultCount'] ) || empty( $data['results'][0]['artworkUrl100'] ) ) {
+				return '';
+			}
+
+			// The search API returns a 100px thumbnail; the same path serves larger sizes.
+			return str_replace( '100x100bb', '600x600bb', $data['results'][0]['artworkUrl100'] );
+		};
+
+		foreach ( $this->get_search_terms( $artist, $album ) as $term ) {
+			// add_query_arg() does not encode values (build_query() passes urlencode=false),
+			// and artist strings routinely contain "&" and ",", so encode before building.
+			$url = add_query_arg(
+				array(
+					'term'   => rawurlencode( $term ),
+					'entity' => 'album',
+					'limit'  => 1,
+				),
+				'https://itunes.apple.com/search'
+			);
+
+			$cover = $this->request_cover( $url, $picker );
+
+			if ( $cover ) {
+				return $cover;
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Look up a cover on the Deezer API.
+	 *
+	 * Keyless. Tries a fielded query first, then a loose one.
+	 *
+	 * Note that Deezer refuses requests from many datacentre IP ranges with a 403
+	 * and an HTML body, so this can fail outright on shared or cloud hosting even
+	 * though it works from a desktop. iTunes is the safer default for that reason.
+	 *
+	 * @param string $artist Artist name.
+	 * @param string $album  Album name.
+	 * @return string Cover URL, or an empty string.
+	 */
+	private function lookup_cover_deezer( $artist, $album ) {
+		$picker = static function ( $data ) {
+			if ( empty( $data['data'][0] ) ) {
+				return '';
+			}
+
+			$hit = $data['data'][0];
+
+			return $hit['cover_xl'] ?? ( $hit['cover_big'] ?? '' );
+		};
+
+		foreach ( $this->get_search_terms( $artist, $album ) as $index => $term ) {
+			// The first pass is fielded, which is stricter and avoids stray matches.
+			$query = 0 === $index
+				? sprintf( 'artist:"%s" album:"%s"', $this->get_primary_artist( $artist ), $album )
+				: $term;
+
+			// Same encoding caveat as the iTunes lookup above.
+			$url = add_query_arg(
+				array(
+					'q'     => rawurlencode( $query ),
+					'limit' => 1,
+				),
+				'https://api.deezer.com/search/album'
+			);
+
+			$cover = $this->request_cover( $url, $picker );
+
+			if ( $cover ) {
+				return $cover;
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Build the search terms to try, in order, for one album.
+	 *
+	 * @param string $artist Artist name.
+	 * @param string $album  Album name.
+	 * @return array List of search strings.
+	 */
+	private function get_search_terms( $artist, $album ) {
+		$terms   = array( $artist . ' ' . $album );
+		$primary = $this->get_primary_artist( $artist );
+
+		if ( $primary !== $artist ) {
+			$terms[] = $primary . ' ' . $album;
+		}
+
+		return $terms;
 	}
 
 	/**
@@ -378,9 +633,11 @@ class Scrobbled_Blocks_API {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Bulk transient cleanup requires direct query.
 		$wpdb->query(
 			$wpdb->prepare(
-				"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
+				"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s OR option_name LIKE %s OR option_name LIKE %s",
 				'_transient_' . self::CACHE_KEY_PREFIX . '%',
-				'_transient_timeout_' . self::CACHE_KEY_PREFIX . '%'
+				'_transient_timeout_' . self::CACHE_KEY_PREFIX . '%',
+				'_transient_' . self::COVER_CACHE_KEY_PREFIX . '%',
+				'_transient_timeout_' . self::COVER_CACHE_KEY_PREFIX . '%'
 			)
 		);
 	}

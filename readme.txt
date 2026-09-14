@@ -59,6 +59,15 @@ This service is provided by Last.fm Ltd.
 
 No personal data from your site visitors is collected or sent to Last.fm. Only your configured Last.fm username and API key are transmitted to retrieve your public listening data.
 
+**Optional: cover art lookup**
+
+Last.fm serves its own grey star image for releases it has no cover for. If "Missing Cover Lookup" is enabled in the plugin settings, those albums are looked up on one additional service of your choosing. This is off by default.
+
+* iTunes (default) -- the artist and album name are sent to https://itunes.apple.com/search. [Apple Media Services Terms](https://www.apple.com/legal/internet-services/itunes/) | [Apple Privacy Policy](https://www.apple.com/legal/privacy/)
+* Deezer -- the artist and album name are sent to https://api.deezer.com/search/album. [Deezer Terms of Use](https://www.deezer.com/legal/cgu) | [Deezer Privacy Policy](https://www.deezer.com/legal/personal-datas)
+
+Only the artist and album name are sent, and only for albums where Last.fm supplied no cover. No API key or account is required for either service, nothing about your site visitors is transmitted, and results are cached locally for 30 days.
+
 == Installation ==
 
 = Automatic Installation =

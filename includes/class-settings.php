@@ -110,6 +110,14 @@ class Scrobbled_Blocks_Settings {
 			self::PAGE_SLUG,
 			'scrobbled_blocks_main_section'
 		);
+
+		add_settings_field(
+			'cover_fallback',
+			__( 'Missing Cover Lookup', 'scrobbled-blocks' ),
+			array( $this, 'render_cover_fallback_field' ),
+			self::PAGE_SLUG,
+			'scrobbled_blocks_main_section'
+		);
 	}
 
 	/**
@@ -159,6 +167,19 @@ class Scrobbled_Blocks_Settings {
 
 		if ( isset( $input['placeholder_image'] ) ) {
 			$sanitized['placeholder_image'] = absint( $input['placeholder_image'] );
+		}
+
+		$sanitized['cover_fallback_enabled'] = ! empty( $input['cover_fallback_enabled'] );
+
+		$provider                             = $input['cover_fallback_provider'] ?? 'itunes';
+		$sanitized['cover_fallback_provider'] = in_array( $provider, array( 'deezer', 'itunes' ), true )
+			? $provider
+			: 'itunes';
+
+		// Cover lookups are cached per album, so a provider change must invalidate them.
+		$previous = $this->get_settings();
+		if ( ( $previous['cover_fallback_provider'] ?? 'itunes' ) !== $sanitized['cover_fallback_provider'] ) {
+			Scrobbled_Blocks_API::get_instance()->clear_cache();
 		}
 
 		// Validate API connection if credentials are provided.
@@ -282,6 +303,52 @@ class Scrobbled_Blocks_Settings {
 	}
 
 	/**
+	 * Render the missing-cover lookup field.
+	 */
+	public function render_cover_fallback_field() {
+		$settings = $this->get_settings();
+		$enabled  = ! empty( $settings['cover_fallback_enabled'] );
+		$provider = $settings['cover_fallback_provider'] ?? 'itunes';
+
+		printf(
+			'<label><input type="checkbox" name="%s[cover_fallback_enabled]" value="1" %s /> %s</label>',
+			esc_attr( self::OPTION_NAME ),
+			checked( $enabled, true, false ),
+			esc_html__( 'Look up covers Last.fm does not have', 'scrobbled-blocks' )
+		);
+
+		echo '<p style="margin: 10px 0 4px;">';
+		printf(
+			'<label for="cover_fallback_provider">%s</label> ',
+			esc_html__( 'Provider:', 'scrobbled-blocks' )
+		);
+		printf(
+			'<select id="cover_fallback_provider" name="%s[cover_fallback_provider]">',
+			esc_attr( self::OPTION_NAME )
+		);
+		foreach ( array(
+			'itunes' => __( 'iTunes', 'scrobbled-blocks' ),
+			'deezer' => __( 'Deezer', 'scrobbled-blocks' ),
+		) as $value => $label ) {
+			printf(
+				'<option value="%s" %s>%s</option>',
+				esc_attr( $value ),
+				selected( $provider, $value, false ),
+				esc_html( $label )
+			);
+		}
+		echo '</select></p>';
+
+		printf(
+			'<p class="description">%s</p>',
+			esc_html__(
+				'Last.fm serves its own grey star for releases it has no cover for. With this enabled, those albums are looked up on the chosen service instead. Results are cached for 30 days, and neither service needs an API key. Deezer tends to match more non-English releases, but refuses requests from many hosting providers; if covers stay missing with it selected, use iTunes.',
+				'scrobbled-blocks'
+			)
+		);
+	}
+
+	/**
 	 * Render settings page.
 	 */
 	public function render_settings_page() {
@@ -359,6 +426,26 @@ class Scrobbled_Blocks_Settings {
 
 		// Return default placeholder.
 		return SCROBBLED_BLOCKS_PLUGIN_URL . 'assets/images/placeholder.svg';
+	}
+
+	/**
+	 * Whether missing covers should be looked up on a fallback provider.
+	 *
+	 * @return bool True when the lookup is enabled.
+	 */
+	public function is_cover_fallback_enabled() {
+		return ! empty( $this->get_setting( 'cover_fallback_enabled', false ) );
+	}
+
+	/**
+	 * Get the configured cover fallback provider.
+	 *
+	 * @return string Either 'itunes' or 'deezer'.
+	 */
+	public function get_cover_provider() {
+		$provider = $this->get_setting( 'cover_fallback_provider', 'itunes' );
+
+		return in_array( $provider, array( 'deezer', 'itunes' ), true ) ? $provider : 'itunes';
 	}
 
 	/**
