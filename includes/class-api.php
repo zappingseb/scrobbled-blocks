@@ -26,6 +26,16 @@ class Scrobbled_Blocks_API {
 	const CACHE_KEY_PREFIX = 'scrobbled_blocks_recent_';
 
 	/**
+	 * Asset hash of the grey star Last.fm serves when it has no cover for a release.
+	 *
+	 * Last.fm returns this as a normal, non-empty image URL rather than an empty
+	 * string, so it has to be recognised explicitly. The hash is stable; the host
+	 * is not (both lastfm.freetls.fastly.net and lastfm-img.freetls.fastly.net
+	 * serve it), so matching is done on the hash alone.
+	 */
+	const LASTFM_PLACEHOLDER_HASH = '2a96cbd8b46e442fc41c2b86b821562f';
+
+	/**
 	 * Single instance of the class.
 	 *
 	 * @var Scrobbled_Blocks_API|null
@@ -270,6 +280,23 @@ class Scrobbled_Blocks_API {
 	}
 
 	/**
+	 * Check whether an image URL is a placeholder rather than real cover art.
+	 *
+	 * Treats both an empty value and Last.fm's own grey-star asset as "no artwork",
+	 * so the configured placeholder applies in either case.
+	 *
+	 * @param string $url Image URL from the API.
+	 * @return bool True when the URL is not real cover art.
+	 */
+	private function is_placeholder_image( $url ) {
+		if ( empty( $url ) ) {
+			return true;
+		}
+
+		return false !== strpos( $url, self::LASTFM_PLACEHOLDER_HASH );
+	}
+
+	/**
 	 * Get artwork URL from track data.
 	 *
 	 * @param array  $track           Track data from API.
@@ -283,21 +310,21 @@ class Scrobbled_Blocks_API {
 
 		// Look for extralarge size (300x300).
 		foreach ( $track['image'] as $image ) {
-			if ( isset( $image['size'] ) && 'extralarge' === $image['size'] && ! empty( $image['#text'] ) ) {
+			if ( isset( $image['size'] ) && 'extralarge' === $image['size'] && ! $this->is_placeholder_image( $image['#text'] ?? '' ) ) {
 				return $image['#text'];
 			}
 		}
 
 		// Fallback to large size.
 		foreach ( $track['image'] as $image ) {
-			if ( isset( $image['size'] ) && 'large' === $image['size'] && ! empty( $image['#text'] ) ) {
+			if ( isset( $image['size'] ) && 'large' === $image['size'] && ! $this->is_placeholder_image( $image['#text'] ?? '' ) ) {
 				return $image['#text'];
 			}
 		}
 
 		// Fallback to any available image.
 		foreach ( $track['image'] as $image ) {
-			if ( ! empty( $image['#text'] ) ) {
+			if ( ! $this->is_placeholder_image( $image['#text'] ?? '' ) ) {
 				return $image['#text'];
 			}
 		}
