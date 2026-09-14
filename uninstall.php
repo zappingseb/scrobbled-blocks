@@ -13,9 +13,9 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 }
 
 // Delete plugin options.
-delete_option( 'scrobbled_blocks_username' );
-delete_option( 'scrobbled_blocks_api_key' );
-delete_option( 'scrobbled_blocks_placeholder_id' );
+// Settings are stored as one serialised array under Scrobbled_Blocks_Settings::OPTION_NAME.
+// That class is not loaded during uninstall, so the option name is repeated here.
+delete_option( 'scrobbled_blocks_settings' );
 
 // Delete all transients created by the plugin.
 global $wpdb;
