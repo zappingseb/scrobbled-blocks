@@ -1,5 +1,6 @@
 # Development files
 .distignore
+.wordpress-org
 .editorconfig
 .gitignore
 .git

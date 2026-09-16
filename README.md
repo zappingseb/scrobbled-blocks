@@ -23,6 +23,28 @@ Scrobbled Blocks brings your Last.fm listening history to your WordPress site us
 - **Responsive Design** — Looks great on all screen sizes
 - **Block Color Controls** — Supports WordPress block color settings for text, background, and link colors
 
+## Screenshots
+
+**Now Playing block in the editor** — live Last.fm data while you edit, with the block's settings in the sidebar.
+
+![Now Playing block selected in the editor, showing live track data and the Display Settings panel](docs/screenshots/now-playing-editor.png)
+
+**Recently Played, grid layout** — artwork leads at 1:1 and titles wrap. Albums Last.fm has no cover for fall back to the placeholder.
+
+![Recently Played block in a three column grid of album artwork](docs/screenshots/recently-played-grid.jpg)
+
+**Recently Played, list layout** — compact rows with artwork, artist and relative time.
+
+![Recently Played block as a list of five tracks](docs/screenshots/recently-played-list.png)
+
+**On the front end** — both blocks on a page.
+
+![A page with a Now playing heading and block above a Recently played list](docs/screenshots/frontend.png)
+
+**Settings** — Settings > Scrobbled Blocks.
+
+![The Scrobbled Blocks settings screen with username, API key and placeholder fields](docs/screenshots/settings.png)
+
 ## Requirements
 
 - WordPress 6.0 or higher
