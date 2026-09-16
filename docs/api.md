@@ -32,6 +32,10 @@ curl -s 'https://ws.audioscrobbler.com/2.0/?method=user.getRecentTracks&user=YOU
 Built in `Scrobbled_Blocks_API::make_request()` via `add_query_arg()`, sent with `wp_remote_get()` on a
 15-second timeout.
 
+The username and key both come from the settings screen:
+
+![The Scrobbled Blocks settings screen, with Last.fm username, API key and default artwork placeholder fields](screenshots/settings.png)
+
 ---
 
 ## 2. The response
@@ -53,34 +57,40 @@ Built in `Scrobbled_Blocks_API::make_request()` via `add_query_arg()`, sent with
 
 The plugin ignores `@attr` entirely — there is no pagination, each render is a fresh top-of-list read.
 
-One track object, verbatim:
+One track object, verbatim. This is the second scrobble in the Recently Played screenshot further down,
+so the payload and the rendered row below are the same data:
 
 ```json
 {
   "artist": {
-    "mbid": "079afcf6-5bf8-421c-b65b-9264dee16090",
-    "#text": "Jazzrausch Bigband"
+    "mbid": "ab2528d9-719f-4261-8098-21849222a0f2",
+    "#text": "Stromae"
   },
   "streamable": "0",
   "image": [
-    { "size": "small",      "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/901f062f346e5b90ef0d1f442f606140.jpg" },
-    { "size": "medium",     "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/901f062f346e5b90ef0d1f442f606140.jpg" },
-    { "size": "large",      "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/901f062f346e5b90ef0d1f442f606140.jpg" },
-    { "size": "extralarge", "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/901f062f346e5b90ef0d1f442f606140.jpg" }
+    { "size": "small",      "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/8bbbc22e83bb40f1c07956ec8e8f578e.png" },
+    { "size": "medium",     "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/8bbbc22e83bb40f1c07956ec8e8f578e.png" },
+    { "size": "large",      "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/8bbbc22e83bb40f1c07956ec8e8f578e.png" },
+    { "size": "extralarge", "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/8bbbc22e83bb40f1c07956ec8e8f578e.png" }
   ],
-  "mbid": "2fcb1884-be41-4bed-9d68-72323a2fb1dc",
+  "mbid": "7dba4726-79be-405a-a6da-150160d9a8e0",
   "album": {
-    "mbid": "7c8a5359-1632-444d-bbba-738347cdec1c",
-    "#text": "Dancing Wittgenstein"
+    "mbid": "348662a8-54ce-4d14-adf5-3ce2cefd57bb",
+    "#text": "Racine carrée"
   },
-  "name": "Moebius Strip (Radio Edit)",
-  "url": "https://www.last.fm/music/Jazzrausch+Bigband/_/Moebius+Strip+(Radio+Edit)",
+  "name": "Ta fête",
+  "url": "https://www.last.fm/music/Stromae/_/Ta+f%C3%AAte",
   "date": {
-    "uts": "1789373868",
-    "#text": "14 Sep 2026, 08:17"
+    "uts": "1789550487",
+    "#text": "16 Sep 2026, 09:21"
   }
 }
 ```
+
+Five of those, rendered by the Recently Played block in its list layout. `Ta fête` is the second row;
+`name` becomes the link, `artist['#text']` the line under it, and `date.uts` the relative time:
+
+![Recently Played block as a list of five tracks, each with album artwork, title, artist and relative time](screenshots/recently-played-list.png)
 
 Mapped by `parse_tracks()` to:
 
@@ -137,8 +147,32 @@ triggers the plugin's placeholder fallback:
 | No image at all | `""` | Yes |
 
 That star-placeholder hash, `2a96cbd8b46e442fc41c2b86b821562f`, is a constant Last.fm serves for any
-release it has no art for. Because it is a valid non-empty URL, `get_artwork_url()` returns it as though
-it were real artwork and the user's configured default is never used.
+release it has no art for. Because it is a valid non-empty URL, an `! empty()` check accepts it as real
+artwork, and a configured default never gets its turn.
+
+Here is a real track that hits this path. Note the hash repeated across all four sizes, and that the
+album name is present — this is not a track missing metadata, Last.fm simply has no cover for it:
+
+```json
+{
+  "artist": { "mbid": "", "#text": "Paul Kalkbrenner, Stromae" },
+  "image": [
+    { "size": "small",      "#text": ".../i/u/34s/2a96cbd8b46e442fc41c2b86b821562f.png" },
+    { "size": "medium",     "#text": ".../i/u/64s/2a96cbd8b46e442fc41c2b86b821562f.png" },
+    { "size": "large",      "#text": ".../i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png" },
+    { "size": "extralarge", "#text": ".../i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png" }
+  ],
+  "album": { "mbid": "", "#text": "QUE CE SOIT CLAIR" },
+  "name": "QUE CE SOIT CLAIR",
+  "url": "https://www.last.fm/music/Paul+Kalkbrenner,+Stromae/_/QUE+CE+SOIT+CLAIR",
+  "date": { "uts": "1789550663", "#text": "16 Sep 2026, 09:24" }
+}
+```
+
+That is the first tile below. With the hash recognised as a placeholder, the block falls through to the
+site's default artwork instead of showing Last.fm's grey star; every other tile has a real cover:
+
+![Recently Played block as a three column grid of album artwork, where the first tile shows a default placeholder reading No artwork available](screenshots/recently-played-grid.jpg)
 
 It is not a rare edge case. Across a sample of 200 consecutive scrobbles from one account:
 
@@ -224,7 +258,9 @@ above mean a normal site makes at most a few calls per minute regardless of traf
 ## 6. The plugin's own REST endpoint
 
 Exposed purely so the block editor can preview live data — the front end is server-rendered and never
-calls it.
+calls it. This is the only thing that consumes it:
+
+![The Now Playing block selected in the WordPress editor, showing live track data and a Display Settings panel with toggles for artwork, timestamp and Last.fm link](screenshots/now-playing-editor.png)
 
 ```
 GET /wp-json/scrobble-blocks/v1/recent-tracks?limit=5
@@ -244,13 +280,13 @@ Success:
   "success": true,
   "tracks": [
     {
-      "name": "Moebius Strip (Radio Edit)",
-      "artist": "Jazzrausch Bigband",
-      "album": "Dancing Wittgenstein",
-      "url": "https://www.last.fm/music/Jazzrausch+Bigband/_/Moebius+Strip+(Radio+Edit)",
-      "timestamp": 1789373868,
+      "name": "Ta fête",
+      "artist": "Stromae",
+      "album": "Racine carrée",
+      "url": "https://www.last.fm/music/Stromae/_/Ta+f%C3%AAte",
+      "timestamp": 1789550487,
       "nowplaying": false,
-      "artwork": "https://lastfm-img.freetls.fastly.net/i/u/300x300/901f062f346e5b90ef0d1f442f606140.jpg"
+      "artwork": "https://lastfm-img.freetls.fastly.net/i/u/300x300/8bbbc22e83bb40f1c07956ec8e8f578e.png"
     }
   ]
 }
