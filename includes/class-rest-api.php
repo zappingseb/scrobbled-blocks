@@ -64,6 +64,7 @@ class Scrobbled_Blocks_REST_API {
 						'minimum'           => 1,
 						'maximum'           => 20,
 						'sanitize_callback' => 'absint',
+						'validate_callback' => 'rest_validate_request_arg',
 					),
 				),
 			)
