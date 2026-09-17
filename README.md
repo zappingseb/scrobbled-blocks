@@ -12,6 +12,8 @@ Scrobbled Blocks brings your Last.fm listening history to your WordPress site us
 
 **Recently Played Block** — Show a list or grid of your recent scrobbles. Configurable from 1-20 tracks, with flexible layout options to match your site's design.
 
+**Top Albums Block** — Your most played albums over the last 7, 30, 90, 180 or 365 days, or all time. Shown as a featured mosaic — one large tile with the rest arranged around it, titles and play counts over the artwork — or as a grid, or a ranked list.
+
 ### Features
 
 - **Live Editor Preview** — See your actual Last.fm data while editing in Gutenberg
@@ -101,7 +103,12 @@ scrobbled-blocks/
 │   │   ├── edit.js
 │   │   ├── index.js
 │   │   └── render.php
-│   └── recently-played/      # Recently Played block source
+│   ├── recently-played/      # Recently Played block source
+│   │   ├── block.json
+│   │   ├── edit.js
+│   │   ├── index.js
+│   │   └── render.php
+│   └── top-albums/           # Top Albums block source
 │       ├── block.json
 │       ├── edit.js
 │       ├── index.js

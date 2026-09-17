@@ -15,13 +15,15 @@ Display your Last.fm listening activity on your WordPress site with native Guten
 
 Scrobbled Blocks brings your Last.fm listening history to your WordPress site using native Gutenberg blocks. Whether you're a music blogger, podcaster, DJ, or just want to share your musical tastes with your audience, this plugin makes it simple.
 
-= Two Powerful Blocks =
+= Three Blocks =
 
 **Now Playing Block**
 Display the track you're currently listening to, or the most recent track you've played. Perfect for sidebars, footers, or anywhere you want to show off your current musical mood.
 
 **Recently Played Block**
 Show a list or grid of your recent scrobbles. Configurable from 1-20 tracks, with flexible layout options to match your site's design.
+
+**Top Albums Block** - Show your most played albums for the last 7, 30, 90, 180 or 365 days, or of all time. Choose a featured mosaic with one large tile and the rest arranged around it, a grid, or a ranked list with play counts.
 
 = Key Features =
 
@@ -43,12 +45,12 @@ This plugin connects to the Last.fm API to retrieve your public listening histor
 
 * Your Last.fm username
 * Your Last.fm API key
-* The number of tracks to retrieve
+* The number of tracks or albums to retrieve, and for Top Albums the period
 
 **When data is sent:**
 
-* When the Now Playing or Recently Played blocks are displayed on a page
-* Data is cached locally to minimise API requests (1 minute for Now Playing, 5 minutes for Recently Played)
+* When the Now Playing, Recently Played or Top Albums blocks are displayed on a page
+* Data is cached locally to minimise API requests (1 minute for Now Playing, 5 minutes for Recently Played, 15 minutes for Top Albums)
 
 **Service provider:**
 
@@ -139,6 +141,10 @@ A single call to the `user.getRecentTracks` method, sending only your username, 
 
 Developers can find captured request and response payloads, the artwork fallback rules and the full Last.fm error-code table in docs/api.md in the [GitHub repository](https://github.com/jordesign/scrobbled-blocks).
 
+= Can I show top albums for an exact date range? =
+
+No. Last.fm's API offers fixed periods only: the last 7, 30, 90, 180 or 365 days, or all time. The endpoint that accepts arbitrary dates returns no artwork, so the Top Albums block uses the fixed periods and lets you pick one per block.
+
 == Screenshots ==
 
 1. Now Playing block in the editor with live preview
@@ -146,8 +152,13 @@ Developers can find captured request and response payloads, the artwork fallback
 3. Recently Played block in list layout
 4. Plugin settings page
 5. Blocks displayed on the frontend
+6. Top Albums block, featured layout
 
 == Changelog ==
+
+= 1.1.0 =
+* New: Top Albums block - most played albums for a chosen period, as a featured mosaic, grid or ranked list
+* Fixed: declared REST argument bounds (limit, period) are now enforced; they were previously documentation only
 
 = 1.0.0 =
 * Initial release

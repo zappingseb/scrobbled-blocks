@@ -10,8 +10,9 @@ For the behaviour these shapes drive, see `includes/class-api.php`.
 
 ## 1. The upstream request
 
-The plugin calls exactly one Last.fm method, `user.getRecentTracks`. Both blocks are fed from it — the
-Now Playing block is `get_recent_tracks( 1, 1 )` returning element `[0]`.
+The Now Playing and Recently Played blocks are both fed from one Last.fm method, `user.getRecentTracks` —
+Now Playing is `get_recent_tracks( 1, 1 )` returning element `[0]`. The Top Albums block uses a second
+method, `user.getTopAlbums`, covered in [section 7](#7-top-albums).
 
 **Base URL:** `https://ws.audioscrobbler.com/2.0/`
 **Authentication:** API key only. No user authentication, no shared secret, no signing — the plugin reads
@@ -301,3 +302,120 @@ Failure:
 **Failures are returned with HTTP 200, not an error status.** This is deliberate: `edit.js` branches on
 `response.success` and shows the message in a `Notice`, so a non-2xx would be rejected by `apiFetch()`
 before that code ran.
+
+---
+
+## 7. Top albums
+
+The Top Albums block uses `user.getTopAlbums`. Same base URL, same authentication, one extra parameter.
+
+```bash
+curl -s 'https://ws.audioscrobbler.com/2.0/?method=user.getTopAlbums&user=YOUR_USERNAME&api_key=YOUR_API_KEY&format=json&period=7day&limit=5'
+```
+
+| `period` | Window |
+|---|---|
+| `7day` | last 7 days (block default) |
+| `1month` | last 30 days |
+| `3month` | last 90 days |
+| `6month` | last 180 days |
+| `12month` | last 365 days |
+| `overall` | all time |
+
+These are the only values Last.fm accepts. There is no arbitrary date range: `user.getWeeklyAlbumChart`
+takes `from`/`to` timestamps but returns no `image` array at all, so it cannot drive a visual block.
+
+The rank 1 album from the response, verbatim. It is the large tile in the screenshot below:
+
+```json
+{
+  "artist": {
+    "url": "https://www.last.fm/music/Ezra+Collective",
+    "name": "Ezra Collective",
+    "mbid": "d51acca9-a88b-4f5c-a2fe-f069de70ca1d"
+  },
+  "image": [
+    { "size": "small",      "#text": "https://lastfm-img.freetls.fastly.net/i/u/34s/144373e63316f45700b07551fabd2c8d.jpg" },
+    { "size": "medium",     "#text": "https://lastfm-img.freetls.fastly.net/i/u/64s/144373e63316f45700b07551fabd2c8d.jpg" },
+    { "size": "large",      "#text": "https://lastfm-img.freetls.fastly.net/i/u/174s/144373e63316f45700b07551fabd2c8d.jpg" },
+    { "size": "extralarge", "#text": "https://lastfm-img.freetls.fastly.net/i/u/300x300/144373e63316f45700b07551fabd2c8d.jpg" }
+  ],
+  "mbid": "39d91a5e-a7db-4a86-825c-ea4758383c29",
+  "url": "https://www.last.fm/music/Ezra+Collective/Here+Because+of+Hope",
+  "playcount": "14",
+  "@attr": { "rank": "1" },
+  "name": "Here Because of Hope"
+}
+```
+
+![Top Albums block in its featured layout: one large tile for the most played album, four smaller tiles beside it, each with title, artist and play count over the artwork](screenshots/top-albums-featured.jpg)
+
+### How albums differ from tracks
+
+`parse_albums()` is a close relative of `parse_tracks()`, with three differences that are easy to trip over:
+
+| | Track | Album |
+|---|---|---|
+| Artist name | `artist['#text']` | `artist['name']` |
+| Time | `date.uts` | none — `playcount` and `@attr.rank` instead |
+| Root key | `recenttracks.track` | `topalbums.album` |
+
+The `image` array has the same shape, so artwork selection is shared with tracks — including the
+placeholder check from [section 3](#3-artwork).
+
+**Missing artwork is signalled differently here.** For `user.getRecentTracks` Last.fm returns its grey-star
+URL; for `user.getTopAlbums` it returns empty strings. Rank 2 in the same response:
+
+```json
+{
+  "name": "Fettes (Live)",
+  "image": [
+    { "size": "small",      "#text": "" },
+    { "size": "medium",     "#text": "" },
+    { "size": "large",      "#text": "" },
+    { "size": "extralarge", "#text": "" }
+  ]
+}
+```
+
+Both forms fall through to the configured placeholder; that is the second tile in the screenshot.
+
+### Caching
+
+| | |
+|---|---|
+| Key | `scrobbled_blocks_topalbums_` + `md5( username . '_' . period . '_' . limit )` |
+| Duration | 15 minutes |
+| Stale fallback | 24 hours, key suffixed `_stale` |
+
+Top albums move slowly compared with recent tracks, hence the longer window.
+
+### The plugin's endpoint
+
+```
+GET /wp-json/scrobble-blocks/v1/top-albums?limit=5&period=7day
+```
+
+Same permission and envelope as `/recent-tracks`; the payload key is `albums`:
+
+```json
+{
+  "success": true,
+  "albums": [
+    {
+      "name":      "Here Because of Hope",
+      "artist":    "Ezra Collective",
+      "url":       "https://www.last.fm/music/Ezra+Collective/Here+Because+of+Hope",
+      "playcount": 14,
+      "rank":      1,
+      "artwork":   "https://lastfm-img.freetls.fastly.net/i/u/300x300/144373e63316f45700b07551fabd2c8d.jpg"
+    }
+  ]
+}
+```
+
+`period` is validated against the six values above and `limit` against 1–20; anything else is a **400**,
+not a silent fallback. This only works because both routes set `'validate_callback' => 'rest_validate_request_arg'`
+explicitly. Supplying a custom `sanitize_callback` on its own replaces WordPress's default
+`rest_parse_request_arg` — the function that actually enforces `minimum`, `maximum` and `enum` — so before
+this the declared bounds on `/recent-tracks` were not enforced either, and `limit=999` fetched 999 tracks.
