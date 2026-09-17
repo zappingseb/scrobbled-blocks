@@ -126,6 +126,9 @@ final class Scrobbled_Blocks {
 
 		// Register Recently Played block.
 		register_block_type( SCROBBLED_BLOCKS_PLUGIN_DIR . 'build/recently-played' );
+
+		// Register Top Albums block.
+		register_block_type( SCROBBLED_BLOCKS_PLUGIN_DIR . 'build/top-albums' );
 	}
 
 	/**

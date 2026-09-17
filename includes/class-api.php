@@ -26,6 +26,19 @@ class Scrobbled_Blocks_API {
 	const CACHE_KEY_PREFIX = 'scrobbled_blocks_recent_';
 
 	/**
+	 * Cache key prefix for top albums.
+	 *
+	 * Shares the scrobbled_blocks_ prefix so the activation, deactivation and
+	 * uninstall transient sweeps clear these too.
+	 */
+	const TOP_ALBUMS_CACHE_KEY_PREFIX = 'scrobbled_blocks_topalbums_';
+
+	/**
+	 * Periods accepted by user.getTopAlbums. Last.fm offers these fixed windows only.
+	 */
+	const TOP_ALBUMS_PERIODS = array( 'overall', '7day', '1month', '3month', '6month', '12month' );
+
+	/**
 	 * Asset hash of the grey star Last.fm serves when it has no cover for a release.
 	 *
 	 * Last.fm returns this as a normal, non-empty image URL rather than an empty
@@ -159,6 +172,127 @@ class Scrobbled_Blocks_API {
 		set_transient( $cache_key . '_stale', $tracks, DAY_IN_SECONDS );
 
 		return $tracks;
+	}
+
+	/**
+	 * Get top albums for a period.
+	 *
+	 * @param int    $limit         Number of albums to fetch.
+	 * @param string $period        One of TOP_ALBUMS_PERIODS.
+	 * @param int    $cache_minutes Cache duration in minutes.
+	 * @param bool   $force_refresh Force refresh the cache.
+	 * @return array|WP_Error Array of albums or WP_Error on failure.
+	 */
+	public function get_top_albums( $limit = 5, $period = '7day', $cache_minutes = 15, $force_refresh = false ) {
+		$settings = Scrobbled_Blocks_Settings::get_instance();
+		$username = $settings->get_username();
+		$api_key  = $settings->get_api_key();
+
+		if ( empty( $username ) || empty( $api_key ) ) {
+			return new WP_Error(
+				'not_configured',
+				__( 'Last.fm API is not configured.', 'scrobbled-blocks' )
+			);
+		}
+
+		if ( ! in_array( $period, self::TOP_ALBUMS_PERIODS, true ) ) {
+			$period = '7day';
+		}
+
+		$cache_key = self::TOP_ALBUMS_CACHE_KEY_PREFIX . md5( $username . '_' . $period . '_' . $limit );
+
+		// Check cache first unless forced refresh.
+		if ( ! $force_refresh ) {
+			$cached = get_transient( $cache_key );
+			if ( false !== $cached ) {
+				return $cached;
+			}
+		}
+
+		$response = $this->make_request(
+			array(
+				'method'  => 'user.getTopAlbums',
+				'user'    => $username,
+				'api_key' => $api_key,
+				'format'  => 'json',
+				'period'  => $period,
+				'limit'   => $limit,
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			// Try to return stale cache on error.
+			$stale = get_transient( $cache_key . '_stale' );
+			if ( false !== $stale ) {
+				return $stale;
+			}
+			return $response;
+		}
+
+		if ( isset( $response['error'] ) ) {
+			return new WP_Error(
+				'lastfm_api_error',
+				$this->get_error_message( $response['error'], $response['message'] ?? '' )
+			);
+		}
+
+		$albums = $this->parse_albums( $response, $limit );
+
+		// Cache the response.
+		$cache_duration = $cache_minutes * MINUTE_IN_SECONDS;
+		set_transient( $cache_key, $albums, $cache_duration );
+
+		// Also set a longer stale cache for fallback.
+		set_transient( $cache_key . '_stale', $albums, DAY_IN_SECONDS );
+
+		return $albums;
+	}
+
+	/**
+	 * Parse albums from a user.getTopAlbums response.
+	 *
+	 * The album objects differ from tracks in two ways that matter here: the
+	 * artist is under artist.name rather than artist['#text'], and there is a
+	 * playcount and a rank instead of a timestamp. The image array has the
+	 * same shape, so artwork selection is shared with tracks.
+	 *
+	 * @param array $response API response.
+	 * @param int   $limit    Maximum number of albums to return.
+	 * @return array Parsed albums.
+	 */
+	private function parse_albums( $response, $limit = 0 ) {
+		$albums = array();
+
+		if ( ! isset( $response['topalbums']['album'] ) ) {
+			return $albums;
+		}
+
+		$raw_albums = $response['topalbums']['album'];
+
+		// Handle single album response (not an array of albums).
+		if ( isset( $raw_albums['name'] ) ) {
+			$raw_albums = array( $raw_albums );
+		}
+
+		$settings        = Scrobbled_Blocks_Settings::get_instance();
+		$placeholder_url = $settings->get_placeholder_url();
+
+		foreach ( $raw_albums as $raw_album ) {
+			$albums[] = array(
+				'name'      => $raw_album['name'] ?? '',
+				'artist'    => $raw_album['artist']['name'] ?? '',
+				'url'       => $raw_album['url'] ?? '',
+				'playcount' => (int) ( $raw_album['playcount'] ?? 0 ),
+				'rank'      => (int) ( $raw_album['@attr']['rank'] ?? count( $albums ) + 1 ),
+				'artwork'   => $this->get_artwork_url( $raw_album, $placeholder_url ),
+			);
+		}
+
+		if ( $limit > 0 && count( $albums ) > $limit ) {
+			$albums = array_slice( $albums, 0, $limit );
+		}
+
+		return $albums;
 	}
 
 	/**
@@ -378,9 +512,11 @@ class Scrobbled_Blocks_API {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Bulk transient cleanup requires direct query.
 		$wpdb->query(
 			$wpdb->prepare(
-				"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
+				"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s OR option_name LIKE %s OR option_name LIKE %s",
 				'_transient_' . self::CACHE_KEY_PREFIX . '%',
-				'_transient_timeout_' . self::CACHE_KEY_PREFIX . '%'
+				'_transient_timeout_' . self::CACHE_KEY_PREFIX . '%',
+				'_transient_' . self::TOP_ALBUMS_CACHE_KEY_PREFIX . '%',
+				'_transient_timeout_' . self::TOP_ALBUMS_CACHE_KEY_PREFIX . '%'
 			)
 		);
 	}

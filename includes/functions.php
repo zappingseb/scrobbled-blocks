@@ -52,3 +52,19 @@ function scrobbled_blocks_get_relative_time( $timestamp ) {
 		$days
 	);
 }
+
+/**
+ * Format a play count for display.
+ *
+ * @param int $count Number of plays.
+ * @return string Formatted string, e.g. "14 plays".
+ */
+function scrobbled_blocks_format_playcount( $count ) {
+	$count = (int) $count;
+
+	return sprintf(
+		/* translators: %s: number of plays */
+		_n( '%s play', '%s plays', $count, 'scrobbled-blocks' ),
+		number_format_i18n( $count )
+	);
+}

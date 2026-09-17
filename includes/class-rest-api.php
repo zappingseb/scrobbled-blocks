@@ -69,6 +69,33 @@ class Scrobbled_Blocks_REST_API {
 				),
 			)
 		);
+
+		register_rest_route(
+			self::REST_NAMESPACE,
+			'/top-albums',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'get_top_albums' ),
+				'permission_callback' => array( $this, 'check_permission' ),
+				'args'                => array(
+					'limit'  => array(
+						'type'              => 'integer',
+						'default'           => 5,
+						'minimum'           => 1,
+						'maximum'           => 20,
+						'sanitize_callback' => 'absint',
+						'validate_callback' => 'rest_validate_request_arg',
+					),
+					'period' => array(
+						'type'              => 'string',
+						'default'           => '7day',
+						'enum'              => Scrobbled_Blocks_API::TOP_ALBUMS_PERIODS,
+						'sanitize_callback' => 'sanitize_text_field',
+						'validate_callback' => 'rest_validate_request_arg',
+					),
+				),
+			)
+		);
 	}
 
 	/**
@@ -119,6 +146,51 @@ class Scrobbled_Blocks_REST_API {
 			array(
 				'success' => true,
 				'tracks'  => $tracks,
+			),
+			200
+		);
+	}
+
+	/**
+	 * Get top albums.
+	 *
+	 * @param WP_REST_Request $request Request object.
+	 * @return WP_REST_Response Response object.
+	 */
+	public function get_top_albums( $request ) {
+		$settings = Scrobbled_Blocks_Settings::get_instance();
+
+		if ( ! $settings->is_configured() ) {
+			return new WP_REST_Response(
+				array(
+					'success' => false,
+					'error'   => __( 'API key not configured', 'scrobbled-blocks' ),
+				),
+				200
+			);
+		}
+
+		$limit  = $request->get_param( 'limit' );
+		$period = $request->get_param( 'period' );
+		$api    = Scrobbled_Blocks_API::get_instance();
+
+		// Top albums move slowly; 15 minutes is plenty.
+		$albums = $api->get_top_albums( $limit, $period, 15 );
+
+		if ( is_wp_error( $albums ) ) {
+			return new WP_REST_Response(
+				array(
+					'success' => false,
+					'error'   => $albums->get_error_message(),
+				),
+				200
+			);
+		}
+
+		return new WP_REST_Response(
+			array(
+				'success' => true,
+				'albums'  => $albums,
 			),
 			200
 		);

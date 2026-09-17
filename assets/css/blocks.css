@@ -191,16 +191,214 @@
 	opacity: 0.7;
 }
 
+/* Top Albums Block - shared */
+.wp-block-scrobble-blocks-top-albums .scrobble-artwork img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+	border-radius: 4px;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.wp-block-scrobble-blocks-top-albums .scrobble-info {
+	display: flex;
+	flex-direction: column;
+	gap: 0.125em;
+	min-width: 0;
+}
+
+.wp-block-scrobble-blocks-top-albums .scrobble-album-name {
+	font-size: var(--scrobble-font-size-track);
+	font-weight: 600;
+}
+
+.wp-block-scrobble-blocks-top-albums .scrobble-album-name a {
+	text-decoration: none;
+}
+
+.wp-block-scrobble-blocks-top-albums .scrobble-album-name a:hover {
+	text-decoration: underline;
+}
+
+.wp-block-scrobble-blocks-top-albums .scrobble-artist {
+	font-size: var(--scrobble-font-size-artist);
+	color: var(--scrobble-color-text-secondary);
+}
+
+.wp-block-scrobble-blocks-top-albums .scrobble-playcount {
+	font-size: var(--scrobble-font-size-timestamp);
+	color: var(--scrobble-color-text-secondary);
+	opacity: 0.7;
+}
+
+/*
+ * Top Albums Block - Featured Layout
+ *
+ * A four-column mosaic. The first album spans two columns and two rows, so
+ * with five albums it fills exactly two rows; further albums flow into full
+ * rows of four beneath. Text sits over the artwork on a gradient.
+ */
+.wp-block-scrobble-blocks-top-albums.is-layout-featured {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	grid-auto-flow: dense;
+	gap: var(--scrobble-featured-gap, 4px);
+}
+
+.wp-block-scrobble-blocks-top-albums.is-layout-featured .scrobble-album {
+	position: relative;
+	aspect-ratio: 1;
+	overflow: hidden;
+	border-radius: 4px;
+	min-width: 0;
+}
+
+.wp-block-scrobble-blocks-top-albums.is-layout-featured .scrobble-album:first-child {
+	grid-column: span 2;
+	grid-row: span 2;
+}
+
+.wp-block-scrobble-blocks-top-albums.is-layout-featured .scrobble-artwork {
+	position: absolute;
+	inset: 0;
+}
+
+.wp-block-scrobble-blocks-top-albums.is-layout-featured .scrobble-artwork img {
+	border-radius: 0;
+	box-shadow: none;
+}
+
+.wp-block-scrobble-blocks-top-albums.is-layout-featured .scrobble-info {
+	position: absolute;
+	inset: auto 0 0 0;
+	padding: 2.5em 1em 1em;
+	gap: 0.2em;
+	background: linear-gradient(to top, rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.45) 55%, rgba(0, 0, 0, 0));
+	color: var(--scrobble-featured-text, #fff);
+}
+
+.wp-block-scrobble-blocks-top-albums.is-layout-featured .scrobble-album-name a,
+.wp-block-scrobble-blocks-top-albums.is-layout-featured .scrobble-artist,
+.wp-block-scrobble-blocks-top-albums.is-layout-featured .scrobble-playcount {
+	color: inherit;
+}
+
+.wp-block-scrobble-blocks-top-albums.is-layout-featured .scrobble-artist,
+.wp-block-scrobble-blocks-top-albums.is-layout-featured .scrobble-playcount {
+	opacity: 0.85;
+}
+
+.wp-block-scrobble-blocks-top-albums.is-layout-featured .scrobble-album:first-child .scrobble-album-name {
+	font-size: 1.5em;
+}
+
+.wp-block-scrobble-blocks-top-albums.is-layout-featured .scrobble-album:first-child .scrobble-info {
+	padding: 3.5em 1.25em 1.25em;
+}
+
+/* Top Albums Block - Grid Layout */
+.wp-block-scrobble-blocks-top-albums.is-layout-grid {
+	display: grid;
+	grid-template-columns: repeat(var(--grid-columns, 3), 1fr);
+	gap: 50px var(--scrobble-gap);
+}
+
+.wp-block-scrobble-blocks-top-albums.is-layout-grid .scrobble-album {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	min-width: 0;
+}
+
+.wp-block-scrobble-blocks-top-albums.is-layout-grid .scrobble-artwork {
+	width: var(--scrobble-artwork-size-grid);
+	aspect-ratio: 1;
+}
+
+.wp-block-scrobble-blocks-top-albums.is-layout-grid .scrobble-album-name,
+.wp-block-scrobble-blocks-top-albums.is-layout-grid .scrobble-artist {
+	word-wrap: break-word;
+	overflow-wrap: break-word;
+}
+
+/* Top Albums Block - List Layout (ranked) */
+.wp-block-scrobble-blocks-top-albums.is-layout-list {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+
+.wp-block-scrobble-blocks-top-albums.is-layout-list ol {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+
+.wp-block-scrobble-blocks-top-albums.is-layout-list .scrobble-album {
+	display: flex;
+	align-items: center;
+	gap: var(--scrobble-gap);
+	padding: 0.5rem 0;
+}
+
+.wp-block-scrobble-blocks-top-albums.is-layout-list .scrobble-album:not(:last-child) {
+	border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.wp-block-scrobble-blocks-top-albums.is-layout-list .scrobble-rank {
+	flex-shrink: 0;
+	min-width: 2ch;
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+	font-size: var(--scrobble-font-size-artist);
+	color: var(--scrobble-color-text-secondary);
+	opacity: 0.7;
+}
+
+.wp-block-scrobble-blocks-top-albums.is-layout-list .scrobble-artwork {
+	flex-shrink: 0;
+	width: var(--scrobble-artwork-size);
+	height: var(--scrobble-artwork-size);
+}
+
+.wp-block-scrobble-blocks-top-albums.is-layout-list .scrobble-album-name,
+.wp-block-scrobble-blocks-top-albums.is-layout-list .scrobble-artist {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 /* Responsive adjustments */
 @media (max-width: 782px) {
-	.wp-block-scrobble-blocks-recently-played.is-layout-grid {
+	.wp-block-scrobble-blocks-recently-played.is-layout-grid,
+	.wp-block-scrobble-blocks-top-albums.is-layout-grid {
 		grid-template-columns: repeat(min(var(--grid-columns, 3), 2), 1fr);
+	}
+
+	/* Two columns: the first album fills a full row, the rest pair up beneath. */
+	.wp-block-scrobble-blocks-top-albums.is-layout-featured {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 }
 
 @media (max-width: 480px) {
-	.wp-block-scrobble-blocks-recently-played.is-layout-grid {
+	.wp-block-scrobble-blocks-recently-played.is-layout-grid,
+	.wp-block-scrobble-blocks-top-albums.is-layout-grid {
 		grid-template-columns: repeat(min(var(--grid-columns, 3), 1), 1fr);
+	}
+
+	.wp-block-scrobble-blocks-top-albums.is-layout-featured {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.wp-block-scrobble-blocks-top-albums.is-layout-featured .scrobble-album:first-child {
+		grid-column: auto;
+		grid-row: auto;
+	}
+
+	.wp-block-scrobble-blocks-top-albums.is-layout-featured .scrobble-album:first-child .scrobble-album-name {
+		font-size: 1.15em;
 	}
 
 	:root {
