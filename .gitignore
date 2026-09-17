@@ -25,3 +25,6 @@ yarn-error.log*
 # Optional: Local development
 .env
 .env.local
+
+# Build tooling
+node_modules/
